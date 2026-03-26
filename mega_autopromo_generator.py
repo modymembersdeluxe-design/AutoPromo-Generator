@@ -320,6 +320,7 @@ class MegaAutoPromoApp:
         top.pack(fill="x", padx=12, pady=8)
 
         ttk.Button(top, text="Save Config JSON", command=self.save_config).pack(side="left", padx=4)
+        ttk.Button(top, text="Import Config JSON", command=self.import_config).pack(side="left", padx=4)
         ttk.Button(top, text="Build Promo", command=lambda: self.render(mode="promo", preview=False)).pack(side="left", padx=4)
         ttk.Button(top, text="Build Remix", command=lambda: self.render(mode="remix", preview=False)).pack(side="left", padx=4)
         ttk.Button(top, text="Build Songs", command=lambda: self.render(mode="songs", preview=False)).pack(side="left", padx=4)
@@ -509,6 +510,77 @@ class MegaAutoPromoApp:
             json.dump(asdict(config), f, indent=2)
         self.log(f"Saved config: {path}")
 
+    def import_config(self):
+        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json"), ("All", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Import error", f"Failed to import JSON config: {exc}")
+            return
+
+        self.source_videos = data.get("source_videos", []) or []
+        self.source_urls = data.get("source_urls", []) or []
+        self.background_songs = data.get("background_songs", []) or []
+        self.effects_files = data.get("effects_library", []) or []
+        self.voiceover_var.set(data.get("voiceover_file", ""))
+        self.title_var.set(data.get("title", self.title_var.get()))
+        self.target_var.set(data.get("target_audience", self.target_var.get()))
+        self.mood_var.set(data.get("mood", self.mood_var.get()))
+        self.remix_style_var.set(data.get("remix_style", self.remix_style_var.get()))
+        self.aspect_ratio_var.set(data.get("aspect_ratio", self.aspect_ratio_var.get()))
+        self.export_format_var.set(data.get("export_format", self.export_format_var.get()))
+        self.preview_quality_var.set(data.get("preview_quality", self.preview_quality_var.get()))
+        self.auto_trim_var.set(bool(data.get("auto_trim", self.auto_trim_var.get())))
+        self.beat_aligned_var.set(bool(data.get("beat_aligned", self.beat_aligned_var.get())))
+        self.theme_transitions_var.set(bool(data.get("theme_transitions", self.theme_transitions_var.get())))
+        self.auto_remix_var.set(bool(data.get("auto_remix", self.auto_remix_var.get())))
+        self.auto_cut_var.set(bool(data.get("auto_cut_detection", self.auto_cut_var.get())))
+        self.auto_edit_var.set(bool(data.get("auto_edit", self.auto_edit_var.get())))
+        self.auto_mute_var.set(bool(data.get("auto_mute", self.auto_mute_var.get())))
+        self.auto_mute_mode_var.set(data.get("auto_mute_mode", self.auto_mute_mode_var.get()))
+        self.color_grade_var.set(bool(data.get("auto_color_grade", self.color_grade_var.get())))
+        self.auto_captions_var.set(bool(data.get("auto_captions", self.auto_captions_var.get())))
+        self.logo_intro_var.set(bool(data.get("include_logo_intro", self.logo_intro_var.get())))
+        self.logo_outro_var.set(bool(data.get("include_logo_outro", self.logo_outro_var.get())))
+        self.stickers_var.set(bool(data.get("include_dynamic_stickers", self.stickers_var.get())))
+        self.lower_third_var.set(bool(data.get("include_lower_third", self.lower_third_var.get())))
+        self.social_var.set(data.get("social_links", self.social_var.get()))
+        self.date_var.set(data.get("promo_date", self.date_var.get()))
+        self.tempo_var.set(int(data.get("tempo_bpm", self.tempo_var.get())))
+        self.tagline_var.set(data.get("tagline", self.tagline_var.get()))
+        self.min_clip_var.set(int(data.get("min_clip_count", self.min_clip_var.get())))
+        self.max_clip_var.set(int(data.get("max_clip_count", self.max_clip_var.get())))
+        self.total_clips_var.set(int(data.get("total_clips", self.total_clips_var.get())))
+        self.width_var.set(int(data.get("output_width", self.width_var.get())))
+        self.height_var.set(int(data.get("output_height", self.height_var.get())))
+        self.fps_var.set(int(data.get("output_fps", self.fps_var.get())))
+        self.bitrate_var.set(int(data.get("bitrate_kbps", self.bitrate_var.get())))
+        self.seed_var.set(int(data.get("random_seed", self.seed_var.get())))
+        self.transition_sec_var.set(str(data.get("transition_sec", self.transition_sec_var.get())))
+        self.dance_intensity_var.set(int(data.get("dance_intensity", self.dance_intensity_var.get())))
+        self.promo_intensity_var.set(int(data.get("promo_intensity", self.promo_intensity_var.get())))
+        self.promo_mode_var.set(data.get("promo_mode", self.promo_mode_var.get()))
+        self.songs_mode_var.set(data.get("songs_mode", self.songs_mode_var.get()))
+        self.remix_mode_var.set(data.get("remix_mode", self.remix_mode_var.get()))
+        self.songs_remix_mode_var.set(data.get("songs_remix_mode", self.songs_remix_mode_var.get()))
+        self.intro_library_var.set(data.get("intro_library", self.intro_library_var.get()))
+        self.outro_library_var.set(data.get("outro_library", self.outro_library_var.get()))
+        self.generated_name_var.set(data.get("generated_name", self.generated_name_var.get()))
+
+        cues = set(data.get("theme_audio_cues", []))
+        for name, var in self.theme_cue_vars.items():
+            var.set(name in cues if cues else var.get())
+
+        self.refresh_sources_view()
+        self.song_list.delete("1.0", END)
+        self.song_list.insert(END, "\n".join(self.background_songs))
+        self.effects_list.delete("1.0", END)
+        self.effects_list.insert(END, "\n".join(self.effects_files))
+        self.log(f"Imported config: {path}")
+
     def render(self, mode: str, preview: bool):
         if not self.source_videos and not self.source_urls:
             messagebox.showwarning("Missing input", "Please add at least one source video file or URL.")
@@ -612,12 +684,42 @@ class MegaAutoPromoApp:
         if preview:
             width, height = (640, 360)
 
-        vf_parts = [f"scale={width}:{height}:force_original_aspect_ratio=decrease", f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"]
+        vf_parts = [f"fps={config.output_fps}", f"scale={width}:{height}:force_original_aspect_ratio=decrease", f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"]
+        if config.auto_trim:
+            vf_parts.append("trim=start=0.0")
         if config.auto_color_grade:
             vf_parts.append("eq=brightness=0.05:saturation=1.25")
-        vf_parts.append(f"fps={config.output_fps}")
+        if config.theme_transitions:
+            vf_parts.append(f"fade=t=in:st=0:d={max(0.1, config.transition_sec)}")
+            vf_parts.append(f"fade=t=out:st=29:d={max(0.1, config.transition_sec)}")
+        if config.auto_cut_detection:
+            vf_parts.append("unsharp=3:3:0.3")
+        if config.auto_edit:
+            vf_parts.append("minterpolate=fps=60:mi_mode=mci")
+        if config.auto_remix:
+            vf_parts.append("setpts=PTS/1.02")
+        if config.include_dynamic_stickers:
+            vf_parts.append("hue=s=1.05")
 
-        vf = ",".join(vf_parts)
+        drawtext_filters = []
+        safe_title = (config.title or "Mega Deluxe Promo").replace(":", r"\:").replace("'", r"\'")
+        safe_target = (config.target_audience or "All").replace(":", r"\:").replace("'", r"\'")
+        safe_tagline = (config.tagline or "").replace(":", r"\:").replace("'", r"\'")
+        safe_social = (config.social_links or "").replace(":", r"\:").replace("'", r"\'")
+        drawtext_filters.append(
+            f"drawtext=text='{safe_title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=40:box=1:boxcolor=black@0.45"
+        )
+        drawtext_filters.append(
+            f"drawtext=text='Mood\\: {config.mood}  Audience\\: {safe_target}':fontcolor=white:fontsize=22:x=30:y=h-140:box=1:boxcolor=black@0.35"
+        )
+        if config.include_lower_third:
+            drawtext_filters.append(
+                f"drawtext=text='Date\\: {config.promo_date} | {safe_social}':fontcolor=yellow:fontsize=20:x=30:y=h-90:box=1:boxcolor=black@0.30"
+            )
+        if safe_tagline:
+            drawtext_filters.append(
+                f"drawtext=text='{safe_tagline}':fontcolor=cyan:fontsize=26:x=(w-text_w)/2:y=h-50:box=1:boxcolor=black@0.3"
+            )
 
         cmd = [
             self.ffmpeg_bin,
@@ -635,20 +737,7 @@ class MegaAutoPromoApp:
         if config.voiceover_file:
             cmd.extend(["-i", config.voiceover_file])
 
-        cmd.extend([
-            "-vf",
-            vf,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast" if preview else "medium",
-            "-crf",
-            "28" if preview else "20",
-            "-b:v",
-            f"{config.bitrate_kbps}k",
-            "-pix_fmt",
-            "yuv420p",
-        ])
+        video_graph = ",".join(vf_parts + drawtext_filters)
 
         if config.auto_remix or config.auto_edit or config.auto_mute or config.background_songs or config.voiceover_file:
             src_vol = "1.0"
@@ -658,28 +747,67 @@ class MegaAutoPromoApp:
                 elif config.auto_mute_mode == "Mute source under voiceover" and config.voiceover_file:
                     src_vol = "0.20"
 
-            filter_parts = [f"[0:a]volume={src_vol}[a0]"]
+            filter_parts = [f"[0:v]{video_graph}[v0]", f"[0:a]highpass=f=120,lowpass=f=8000,loudnorm,volume={src_vol}[a0]"]
             mix_inputs = ["[a0]"]
 
             if config.background_songs:
-                filter_parts.append("[1:a]volume=0.25[a1]")
+                filter_parts.append("[1:a]volume=0.25,afade=t=in:st=0:d=1.5[a1]")
                 mix_inputs.append("[a1]")
             if config.voiceover_file:
                 vo_index = 2 if config.background_songs else 1
-                filter_parts.append(f"[{vo_index}:a]volume=1.00[a2]")
+                filter_parts.append(f"[{vo_index}:a]volume=1.00,acompressor=threshold=-16dB:ratio=3[a2]")
                 mix_inputs.append("[a2]")
 
             if len(mix_inputs) > 1:
-                filter_parts.append(f"{''.join(mix_inputs)}amix=inputs={len(mix_inputs)}:duration=shortest:normalize=0[mix]")
+                filter_parts.append(
+                    f"{''.join(mix_inputs)}amix=inputs={len(mix_inputs)}:duration=shortest:normalize=0,volume=1.5,alimiter=limit=0.95[mix]"
+                )
                 filter_complex = ";".join(filter_parts)
-                cmd.extend(["-filter_complex", filter_complex, "-map", "0:v:0", "-map", "[mix]"])
+                cmd.extend(["-filter_complex", filter_complex, "-map", "[v0]", "-map", "[mix]"])
             else:
-                cmd.extend(["-filter:a", f"volume={src_vol}", "-map", "0:v:0", "-map", "0:a:0"])
+                cmd.extend(
+                    [
+                        "-filter_complex",
+                        ";".join(filter_parts),
+                        "-map",
+                        "[v0]",
+                        "-map",
+                        "[a0]",
+                    ]
+                )
 
             cmd.append("-shortest")
+        else:
+            cmd.extend(["-vf", video_graph, "-map", "0:v:0", "-map", "0:a:0?"])
+
+        cmd.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast" if preview else "medium",
+                "-crf",
+                "28" if preview else "20",
+                "-b:v",
+                f"{config.bitrate_kbps}k",
+                "-pix_fmt",
+                "yuv420p",
+                "-r",
+                str(config.output_fps),
+                "-metadata",
+                f"title={config.title}",
+                "-metadata",
+                f"comment=Mega Deluxe {build_mode} | mood={config.mood} | remix={config.remix_mode}",
+            ]
+        )
 
         if build_mode == "songs":
             cmd.extend(["-t", str(max(10, config.total_clips * 2))])
+        if config.export_format == "gif teaser":
+            cmd.extend(["-an", "-loop", "0", output_path.replace(".mp4", ".gif")])
+            return cmd
+        if config.export_format == "web preview":
+            cmd.extend(["-movflags", "+faststart"])
 
         cmd.append(output_path)
         return cmd

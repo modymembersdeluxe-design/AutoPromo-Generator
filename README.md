@@ -67,6 +67,11 @@ On Windows:
 run_windows.bat
 ```
 
+## Config JSON
+
+- Use **Save Config JSON** to export all current generation settings.
+- Use **Import Config JSON** to restore a previously saved setup (sources, modes, output settings, and mega-deluxe options).
+
 ## Dependencies
 
 - Python 3.8+ (recommended for Windows 8.1 compatibility)
@@ -82,4 +87,4 @@ run_windows.bat
 
 ## Notes
 
-This app currently emphasizes workflow orchestration and FFmpeg command generation in a single GUI. It includes practical placeholders for "AI" edit selection logic and can be extended with scene-detection, beat-detection, and captioning pipelines.
+This app now generates a longer FFmpeg pipeline including metadata overlays, drawtext promo elements, audio loudness/limiter chain, optional background-song + voiceover remix, transition fades, color enhancement, and mode-aware export behavior for promo/remix/songs.

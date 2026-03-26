@@ -18,7 +18,6 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
   - Theme transition toggles
   - Auto-cut / action-point detection toggles
   - Auto-edit support toggle
-  - AI best-frame selection toggle
   - Kids-oriented auto color grading
 
 - **Music & Audio Features**
@@ -28,13 +27,6 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
   - Auto-volume leveling model (speech > music > effects)
   - Auto-mute support with selectable mute modes
 
-- **Graphics & Promo Elements**
-  - Title animation controls
-  - Lower-third text fields (date + social links)
-  - Logo intro/outro toggles
-  - Dynamic sticker controls
-  - Auto-caption toggle
-
 - **Output Options**
   - Aspect ratios: 4:3, 16:9, 9:16
   - Exports: mp4, gif teaser, web preview
@@ -42,11 +34,8 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
   - Quality profile selector (includes 360p)
   - Mega Deluxe controls for Width, Height, FPS, 360p preview profile, bitrate
 
-- **Promo & Song Logic**
-  - Remix styles: Kids dance, Funk, Pop kids
-  - Theme cues: Clap, Cheer, Whoosh
-  - Automatic tagline generation based on mood + tempo
-  - Build modes: Promo / Remix / Songs
+- **Build Modes**
+  - Promo / Remix / Songs
 
 - **Mega Deluxe Generation Settings**
   - Min Clip / Max Clip / Total Clips for promo-remix-song generation

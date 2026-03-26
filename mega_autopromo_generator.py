@@ -167,9 +167,7 @@ class MegaAutoPromoApp:
             "Input & Sources": ttk.Frame(notebook),
             "Auto Remix/Edit": ttk.Frame(notebook),
             "Music & Audio": ttk.Frame(notebook),
-            "Graphics": ttk.Frame(notebook),
             "Output": ttk.Frame(notebook),
-            "Promo Logic": ttk.Frame(notebook),
             "Mega Deluxe Settings": ttk.Frame(notebook),
             "Build & Preview": ttk.Frame(notebook),
         }
@@ -180,9 +178,7 @@ class MegaAutoPromoApp:
         self.build_sources_tab(tabs["Input & Sources"])
         self.build_auto_edit_tab(tabs["Auto Remix/Edit"])
         self.build_audio_tab(tabs["Music & Audio"])
-        self.build_graphics_tab(tabs["Graphics"])
         self.build_output_tab(tabs["Output"])
-        self.build_promo_tab(tabs["Promo Logic"])
         self.build_mega_deluxe_tab(tabs["Mega Deluxe Settings"])
         self.build_build_tab(tabs["Build & Preview"])
 
@@ -654,10 +650,6 @@ class MegaAutoPromoApp:
         output_ext = "mp4" if config.export_format == "mp4" else "mp4"
         output_path = str(Path.cwd() / f"{output_name}.{output_ext}")
 
-        drawtext_enabled = self.can_use_drawtext()
-        if not drawtext_enabled:
-            self.log("Drawtext disabled: no usable font configuration detected for this platform.")
-
         ffmpeg_cmd = self.build_ffmpeg_command(
             config,
             concat_path,
@@ -665,7 +657,6 @@ class MegaAutoPromoApp:
             preview,
             build_mode,
             timeline_duration,
-            enable_drawtext=drawtext_enabled,
         )
         self.log("FFmpeg command:\n" + " ".join(shlex.quote(s) for s in ffmpeg_cmd))
 
@@ -843,7 +834,6 @@ class MegaAutoPromoApp:
         preview: bool,
         build_mode: str,
         timeline_duration: float,
-        enable_drawtext: bool = True,
     ):
         width, height = config.output_width, config.output_height
         if config.aspect_ratio in {"4:3", "16:9", "9:16"} and (not config.output_width or not config.output_height):
@@ -875,30 +865,6 @@ class MegaAutoPromoApp:
             vf_parts.append("tblend=all_mode=average")
         if config.auto_remix:
             vf_parts.append("setpts=PTS/1.02")
-        if config.include_dynamic_stickers:
-            vf_parts.append("hue=s=1.05")
-
-        drawtext_filters = []
-        if enable_drawtext:
-            font_arg = self.get_drawtext_font_arg()
-            safe_title = (config.title or "Mega Deluxe Promo").replace(":", r"\:").replace("'", r"\'")
-            safe_target = (config.target_audience or "All").replace(":", r"\:").replace("'", r"\'")
-            safe_tagline = (config.tagline or "").replace(":", r"\:").replace("'", r"\'")
-            safe_social = (config.social_links or "").replace(":", r"\:").replace("'", r"\'")
-            drawtext_filters.append(
-                f"drawtext{font_arg}:text='{safe_title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=40:box=1:boxcolor=black@0.45"
-            )
-            drawtext_filters.append(
-                f"drawtext{font_arg}:text='Mood\\: {config.mood}  Audience\\: {safe_target}':fontcolor=white:fontsize=22:x=30:y=h-140:box=1:boxcolor=black@0.35"
-            )
-            if config.include_lower_third:
-                drawtext_filters.append(
-                    f"drawtext{font_arg}:text='Date\\: {config.promo_date} | {safe_social}':fontcolor=yellow:fontsize=20:x=30:y=h-90:box=1:boxcolor=black@0.30"
-                )
-            if safe_tagline:
-                drawtext_filters.append(
-                    f"drawtext{font_arg}:text='{safe_tagline}':fontcolor=cyan:fontsize=26:x=(w-text_w)/2:y=h-50:box=1:boxcolor=black@0.3"
-                )
 
         cmd = [
             self.ffmpeg_bin,
@@ -918,7 +884,7 @@ class MegaAutoPromoApp:
         if config.effects_library:
             cmd.extend(["-i", config.effects_library[0]])
 
-        video_graph = ",".join(vf_parts + drawtext_filters)
+        video_graph = ",".join(vf_parts)
 
         if config.auto_remix or config.auto_edit or config.auto_mute or config.background_songs or config.voiceover_file:
             src_vol = "1.0"

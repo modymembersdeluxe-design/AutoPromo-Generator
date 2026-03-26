@@ -664,8 +664,28 @@ class MegaAutoPromoApp:
             proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=False)
             self.log(proc.stdout.strip() or "(no stdout)")
             if proc.returncode != 0:
-                self.log(proc.stderr.strip())
-                self.log(f"Render failed with code {proc.returncode}")
+                err = proc.stderr.strip()
+                self.log(err)
+                if "Fontconfig error" in err or "Cannot load default config file" in err:
+                    self.log("Fontconfig issue detected. Retrying render with text overlays disabled.")
+                    retry_cmd = self.build_ffmpeg_command(
+                        config,
+                        concat_path,
+                        output_path,
+                        preview,
+                        build_mode,
+                        timeline_duration,
+                        enable_drawtext=False,
+                    )
+                    retry_proc = subprocess.run(retry_cmd, capture_output=True, text=True, check=False)
+                    self.log(retry_proc.stdout.strip() or "(no stdout)")
+                    if retry_proc.returncode == 0:
+                        self.log(f"Render completed without drawtext overlays: {output_path}")
+                    else:
+                        self.log(retry_proc.stderr.strip())
+                        self.log(f"Render failed with code {retry_proc.returncode}")
+                else:
+                    self.log(f"Render failed with code {proc.returncode}")
             else:
                 self.log(f"Render completed: {output_path}")
         except FileNotFoundError:
@@ -841,6 +861,8 @@ class MegaAutoPromoApp:
             vf_parts.append("unsharp=3:3:0.3")
         if config.auto_edit:
             vf_parts.append("minterpolate=fps=60:mi_mode=mci")
+        if config.ai_best_frame_selection:
+            vf_parts.append("tblend=all_mode=average")
         if config.auto_remix:
             vf_parts.append("setpts=PTS/1.02")
 
@@ -946,6 +968,23 @@ class MegaAutoPromoApp:
 
         cmd.append(output_path)
         return cmd
+
+    def can_use_drawtext(self):
+        if platform.system().lower() != "windows":
+            return True
+        return bool(self.get_drawtext_font_arg())
+
+    def get_drawtext_font_arg(self):
+        candidates = [
+            Path("C:/Windows/Fonts/arial.ttf"),
+            Path("C:/Windows/Fonts/segoeui.ttf"),
+            Path("C:/Windows/Fonts/tahoma.ttf"),
+        ]
+        for font_path in candidates:
+            if font_path.exists():
+                safe = str(font_path).replace("\\", "/").replace(":", r"\:")
+                return f":fontfile='{safe}'"
+        return ""
 
     def log(self, text):
         self.log_box.insert(END, f"{datetime.utcnow().isoformat()} | {text}\n")

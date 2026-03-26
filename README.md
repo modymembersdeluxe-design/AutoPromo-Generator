@@ -53,9 +53,16 @@ python3 mega_autopromo_generator.py
 
 ## Dependencies
 
-- Python 3.10+
+- Python 3.8+ (recommended for Windows 8.1 compatibility)
 - FFmpeg in PATH
 - Optional: `yt-dlp` in PATH for URL clip download
+
+## Windows 8.1 support
+
+- The app includes Windows-specific compatibility behavior:
+  - prefers `ffmpeg.exe` / `yt-dlp.exe` resolution when available
+  - normalizes concat file paths for FFmpeg on Windows
+  - logs Windows 8.1 compatibility mode at startup
 
 ## Notes
 

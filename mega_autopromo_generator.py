@@ -1,7 +1,9 @@
 import json
 import os
+import platform
 import random
 import shlex
+import shutil
 import subprocess
 import threading
 from dataclasses import dataclass, asdict
@@ -68,6 +70,8 @@ class MegaAutoPromoApp:
         self.source_urls = []
         self.background_songs = []
         self.effects_files = []
+        self.ffmpeg_bin = self.resolve_binary("ffmpeg")
+        self.ytdlp_bin = self.resolve_binary("yt-dlp")
 
         self.title_var = StringVar(value="My Kids Mega Promo")
         self.target_var = StringVar(value="Kids & Families")
@@ -106,6 +110,7 @@ class MegaAutoPromoApp:
 
         self.build_ui()
         self.update_tagline()
+        self.log_platform_support()
 
     def build_ui(self):
         notebook = ttk.Notebook(self.root)
@@ -261,6 +266,26 @@ class MegaAutoPromoApp:
         self.log_box = Text(frame, height=30)
         self.log_box.pack(fill="both", expand=True, padx=12, pady=8)
         self.log("Ready. Add sources and click Build Preview or Build Final.")
+
+    def resolve_binary(self, base_name: str):
+        # Windows 8.1 support: prefer .exe when available.
+        is_windows = platform.system().lower() == "windows"
+        candidates = [base_name]
+        if is_windows:
+            candidates = [f"{base_name}.exe", base_name]
+        for candidate in candidates:
+            path = shutil.which(candidate)
+            if path:
+                return path
+        return base_name
+
+    def log_platform_support(self):
+        system = platform.system()
+        release = platform.release()
+        if system == "Windows" and release == "8.1":
+            self.log("Windows 8.1 compatibility mode active.")
+        else:
+            self.log(f"Platform detected: {system} {release}")
 
     def _entry_row(self, parent, label, variable):
         row = ttk.Frame(parent)
@@ -444,7 +469,7 @@ class MegaAutoPromoApp:
         self.log(f"Downloading URL clip (best resolution): {url}")
         out = str(Path.cwd() / f"clip_{abs(hash(url)) % 100000}.mp4")
         cmd = [
-            "yt-dlp",
+            self.ytdlp_bin,
             "-f",
             "bestvideo+bestaudio/best",
             "-o",
@@ -467,7 +492,10 @@ class MegaAutoPromoApp:
         concat_path = str(Path.cwd() / "concat_inputs.txt")
         with open(concat_path, "w", encoding="utf-8") as f:
             for c in clips:
-                safe_c = c.replace("'", "'\\''")
+                normalized = str(Path(c))
+                if platform.system().lower() == "windows":
+                    normalized = normalized.replace("\\", "/")
+                safe_c = normalized.replace("'", "'\\''")
                 f.write(f"file '{safe_c}'\n")
         self.log(f"Concat list written: {concat_path}")
         return concat_path
@@ -489,7 +517,7 @@ class MegaAutoPromoApp:
         vf = ",".join(vf_parts)
 
         cmd = [
-            "ffmpeg",
+            self.ffmpeg_bin,
             "-y",
             "-f",
             "concat",
@@ -499,13 +527,10 @@ class MegaAutoPromoApp:
             concat_path,
         ]
 
-        audio_input_count = 1
         if config.background_songs:
             cmd.extend(["-i", config.background_songs[0]])
-            audio_input_count += 1
         if config.voiceover_file:
             cmd.extend(["-i", config.voiceover_file])
-            audio_input_count += 1
 
         cmd.extend([
             "-vf",

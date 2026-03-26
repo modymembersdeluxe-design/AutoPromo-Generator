@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import platform
 import random
@@ -22,7 +23,7 @@ from tkinter import (
 from tkinter import simpledialog
 from tkinter import ttk
 
-APP_TITLE = "Mega AutoPromo Generator"
+APP_TITLE = "Mega AutoPromo Generator V2"
 
 
 @dataclass
@@ -44,6 +45,7 @@ class PromoConfig:
     theme_transitions: bool
     auto_remix: bool
     auto_cut_detection: bool
+    ai_best_frame_selection: bool
     auto_edit: bool
     auto_mute: bool
     auto_mute_mode: str
@@ -76,6 +78,9 @@ class PromoConfig:
     intro_library: str
     outro_library: str
     generated_name: str
+    enable_v2_longform: bool
+    target_duration_sec: int
+    estimated_clip_sec: float
 
 
 class MegaAutoPromoApp:
@@ -89,7 +94,9 @@ class MegaAutoPromoApp:
         self.background_songs = []
         self.effects_files = []
         self.ffmpeg_bin = self.resolve_binary("ffmpeg")
+        self.ffprobe_bin = self.resolve_binary("ffprobe")
         self.ytdlp_bin = self.resolve_binary("yt-dlp")
+        self.media_probe_cache = {}
 
         self.title_var = StringVar(value="My Kids Mega Promo")
         self.target_var = StringVar(value="Kids & Families")
@@ -104,12 +111,16 @@ class MegaAutoPromoApp:
         self.tempo_var = IntVar(value=120)
         self.tagline_var = StringVar(value="")
         self.generated_name_var = StringVar(value="generated_mega_deluxe")
+        self.enable_v2_longform_var = BooleanVar(value=True)
+        self.target_duration_var = IntVar(value=120)
+        self.avg_clip_sec_var = StringVar(value="3.5")
 
         self.auto_trim_var = BooleanVar(value=True)
         self.best_resolution_var = BooleanVar(value=True)
         self.beat_aligned_var = BooleanVar(value=True)
         self.theme_transitions_var = BooleanVar(value=True)
         self.auto_cut_var = BooleanVar(value=True)
+        self.ai_best_frame_var = BooleanVar(value=True)
         self.auto_remix_var = BooleanVar(value=True)
         self.auto_edit_var = BooleanVar(value=True)
         self.auto_mute_var = BooleanVar(value=True)
@@ -186,6 +197,7 @@ class MegaAutoPromoApp:
         video_btns.pack(fill="x", padx=6, pady=4)
         ttk.Button(video_btns, text="Add local clips", command=self.add_video_files).pack(side="left", padx=4)
         ttk.Button(video_btns, text="Add URL clip", command=self.add_video_url).pack(side="left", padx=4)
+        ttk.Button(video_btns, text="Bulk URL import", command=self.add_video_urls_bulk).pack(side="left", padx=4)
         ttk.Button(video_btns, text="Clear", command=self.clear_video_sources).pack(side="left", padx=4)
 
         ttk.Checkbutton(left, text="Prefer best resolution available", variable=self.best_resolution_var).pack(anchor="w", padx=6)
@@ -227,7 +239,7 @@ class MegaAutoPromoApp:
         ttk.Checkbutton(lf, text="Theme transitions (smooth + color/motion matching)", variable=self.theme_transitions_var).pack(anchor="w", pady=4)
         ttk.Checkbutton(lf, text="Auto-cut detection (identify action points)", variable=self.auto_cut_var).pack(anchor="w", pady=4)
         ttk.Checkbutton(lf, text="Auto-edit support", variable=self.auto_edit_var).pack(anchor="w", pady=4)
-        ttk.Checkbutton(lf, text="AI best-frame selection", variable=self.auto_cut_var).pack(anchor="w", pady=4)
+        ttk.Checkbutton(lf, text="AI best-frame selection", variable=self.ai_best_frame_var).pack(anchor="w", pady=4)
         ttk.Checkbutton(lf, text="Auto color grading (kids brightness/saturation)", variable=self.color_grade_var).pack(anchor="w", pady=4)
 
         ttk.Label(lf, text="Tempo (BPM) for beat alignment:").pack(anchor="w", pady=(12, 2))
@@ -314,6 +326,14 @@ class MegaAutoPromoApp:
         self._combo_row(lf, "Songs remix mode", self.songs_remix_mode_var, ["Balanced", "Aggressive", "Smooth"])
         self._entry_row(lf, "Intro library", self.intro_library_var)
         self._entry_row(lf, "Outro library", self.outro_library_var)
+        ttk.Separator(lf, orient="horizontal").pack(fill="x", pady=10)
+        ttk.Checkbutton(
+            lf,
+            text="Enable Mega AutoPromo Generator V2 (long-form auto expansion)",
+            variable=self.enable_v2_longform_var,
+        ).pack(anchor="w", pady=2)
+        self._entry_row(lf, "Target duration (sec)", self.target_duration_var)
+        self._entry_row(lf, "Estimated clip sec", self.avg_clip_sec_var)
 
     def build_build_tab(self, frame):
         top = ttk.Frame(frame)
@@ -373,6 +393,17 @@ class MegaAutoPromoApp:
         if url:
             self.source_urls.append(url)
             self.refresh_sources_view()
+
+    def add_video_urls_bulk(self):
+        raw = self.simple_prompt("Paste one URL per line", "https://...\nhttps://...")
+        if not raw:
+            return
+        urls = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not urls:
+            return
+        self.source_urls.extend(urls)
+        self.refresh_sources_view()
+        self.log(f"Imported {len(urls)} URL sources.")
 
     def clear_video_sources(self):
         self.source_videos.clear()
@@ -449,6 +480,10 @@ class MegaAutoPromoApp:
             transition_sec = max(0.0, float(self.transition_sec_var.get()))
         except ValueError:
             transition_sec = 0.45
+        try:
+            estimated_clip_sec = max(0.5, float(self.avg_clip_sec_var.get()))
+        except ValueError:
+            estimated_clip_sec = 3.5
         return PromoConfig(
             source_videos=self.source_videos,
             source_urls=self.source_urls,
@@ -467,6 +502,7 @@ class MegaAutoPromoApp:
             theme_transitions=self.theme_transitions_var.get(),
             auto_remix=self.auto_remix_var.get(),
             auto_cut_detection=self.auto_cut_var.get(),
+            ai_best_frame_selection=self.ai_best_frame_var.get(),
             auto_edit=self.auto_edit_var.get(),
             auto_mute=self.auto_mute_var.get(),
             auto_mute_mode=self.auto_mute_mode_var.get(),
@@ -499,6 +535,9 @@ class MegaAutoPromoApp:
             intro_library=self.intro_library_var.get(),
             outro_library=self.outro_library_var.get(),
             generated_name=self.generated_name_var.get().strip() or "generated_mega_deluxe",
+            enable_v2_longform=self.enable_v2_longform_var.get(),
+            target_duration_sec=max(15, self.target_duration_var.get()),
+            estimated_clip_sec=estimated_clip_sec,
         )
 
     def save_config(self):
@@ -538,6 +577,7 @@ class MegaAutoPromoApp:
         self.theme_transitions_var.set(bool(data.get("theme_transitions", self.theme_transitions_var.get())))
         self.auto_remix_var.set(bool(data.get("auto_remix", self.auto_remix_var.get())))
         self.auto_cut_var.set(bool(data.get("auto_cut_detection", self.auto_cut_var.get())))
+        self.ai_best_frame_var.set(bool(data.get("ai_best_frame_selection", self.ai_best_frame_var.get())))
         self.auto_edit_var.set(bool(data.get("auto_edit", self.auto_edit_var.get())))
         self.auto_mute_var.set(bool(data.get("auto_mute", self.auto_mute_var.get())))
         self.auto_mute_mode_var.set(data.get("auto_mute_mode", self.auto_mute_mode_var.get()))
@@ -569,6 +609,9 @@ class MegaAutoPromoApp:
         self.intro_library_var.set(data.get("intro_library", self.intro_library_var.get()))
         self.outro_library_var.set(data.get("outro_library", self.outro_library_var.get()))
         self.generated_name_var.set(data.get("generated_name", self.generated_name_var.get()))
+        self.enable_v2_longform_var.set(bool(data.get("enable_v2_longform", self.enable_v2_longform_var.get())))
+        self.target_duration_var.set(int(data.get("target_duration_sec", self.target_duration_var.get())))
+        self.avg_clip_sec_var.set(str(data.get("estimated_clip_sec", self.avg_clip_sec_var.get())))
 
         cues = set(data.get("theme_audio_cues", []))
         for name, var in self.theme_cue_vars.items():
@@ -600,24 +643,54 @@ class MegaAutoPromoApp:
                 downloaded.append(out)
 
         input_clips = self.select_clips_for_mode(config.source_videos + downloaded, config, build_mode)
+        self.log_source_diagnostics(input_clips)
         if config.intro_library:
             input_clips.insert(0, config.intro_library)
         if config.outro_library:
             input_clips.append(config.outro_library)
-        concat_path = self.write_concat_file(input_clips, build_mode)
+        timeline_duration = self.estimate_timeline_duration(input_clips, config)
+        concat_path = self.write_concat_file(input_clips, build_mode, config)
         output_name = f"{config.generated_name}_{build_mode}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         output_ext = "mp4" if config.export_format == "mp4" else "mp4"
         output_path = str(Path.cwd() / f"{output_name}.{output_ext}")
 
-        ffmpeg_cmd = self.build_ffmpeg_command(config, concat_path, output_path, preview, build_mode)
+        ffmpeg_cmd = self.build_ffmpeg_command(
+            config,
+            concat_path,
+            output_path,
+            preview,
+            build_mode,
+            timeline_duration,
+            enable_drawtext=True,
+        )
         self.log("FFmpeg command:\n" + " ".join(shlex.quote(s) for s in ffmpeg_cmd))
 
         try:
             proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=False)
             self.log(proc.stdout.strip() or "(no stdout)")
             if proc.returncode != 0:
-                self.log(proc.stderr.strip())
-                self.log(f"Render failed with code {proc.returncode}")
+                err = proc.stderr.strip()
+                self.log(err)
+                if "Fontconfig error" in err or "Cannot load default config file" in err:
+                    self.log("Fontconfig issue detected. Retrying render with text overlays disabled.")
+                    retry_cmd = self.build_ffmpeg_command(
+                        config,
+                        concat_path,
+                        output_path,
+                        preview,
+                        build_mode,
+                        timeline_duration,
+                        enable_drawtext=False,
+                    )
+                    retry_proc = subprocess.run(retry_cmd, capture_output=True, text=True, check=False)
+                    self.log(retry_proc.stdout.strip() or "(no stdout)")
+                    if retry_proc.returncode == 0:
+                        self.log(f"Render completed without drawtext overlays: {output_path}")
+                    else:
+                        self.log(retry_proc.stderr.strip())
+                        self.log(f"Render failed with code {retry_proc.returncode}")
+                else:
+                    self.log(f"Render failed with code {proc.returncode}")
             else:
                 self.log(f"Render completed: {output_path}")
         except FileNotFoundError:
@@ -631,19 +704,100 @@ class MegaAutoPromoApp:
         rng = random.Random(config.random_seed + len(build_mode))
         shuffled = clips[:]
         rng.shuffle(shuffled)
-        cap = min(config.total_clips, config.max_clip_count, len(shuffled))
+        requested_clip_count = config.total_clips
+        if config.enable_v2_longform:
+            target_clip_count = math.ceil(config.target_duration_sec / max(0.5, config.estimated_clip_sec))
+            requested_clip_count = max(requested_clip_count, target_clip_count)
+
+        cap = min(requested_clip_count, config.max_clip_count, len(shuffled))
         cap = max(config.min_clip_count, cap)
         selected = shuffled[:cap]
+        if config.enable_v2_longform and selected:
+            estimated_duration = self.estimate_timeline_duration(selected, config)
+            if estimated_duration < config.target_duration_sec:
+                loop_index = 0
+                while estimated_duration < config.target_duration_sec and len(selected) < 500:
+                    selected.append(selected[loop_index % len(selected)])
+                    loop_index += 1
+                    estimated_duration = self.estimate_timeline_duration(selected, config)
+                self.log(
+                    f"V2 long-form expanded clip list to {len(selected)} clips "
+                    f"(estimated {estimated_duration:.1f}s target {config.target_duration_sec}s)."
+                )
         self.log(f"Selected {len(selected)} clips for {build_mode} using seed {config.random_seed}.")
         return selected
 
+    def probe_media(self, media_path: str):
+        if media_path in self.media_probe_cache:
+            return self.media_probe_cache[media_path]
+
+        info = {"duration": None, "has_audio": False}
+        cmd = [
+            self.ffprobe_bin,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=codec_type",
+            "-of",
+            "json",
+            media_path,
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode == 0 and proc.stdout.strip():
+                data = json.loads(proc.stdout)
+                duration_raw = ((data.get("format") or {}).get("duration"))
+                if duration_raw is not None:
+                    info["duration"] = max(0.0, float(duration_raw))
+                streams = data.get("streams") or []
+                info["has_audio"] = any((s.get("codec_type") == "audio") for s in streams)
+            else:
+                self.log(f"ffprobe could not read: {media_path}")
+        except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
+            pass
+
+        self.media_probe_cache[media_path] = info
+        return info
+
+    def log_source_diagnostics(self, clips: list):
+        if not clips:
+            return
+        durations = []
+        audio_count = 0
+        for clip in clips:
+            info = self.probe_media(clip)
+            if info["duration"]:
+                durations.append(info["duration"])
+            if info["has_audio"]:
+                audio_count += 1
+        if durations:
+            total = sum(durations)
+            self.log(
+                f"Source diagnostics: clips={len(clips)} | with_audio={audio_count} | "
+                f"duration_total={total:.1f}s | avg={total/len(durations):.1f}s"
+            )
+
+    def effective_clip_duration(self, clip_path: str, config: PromoConfig):
+        info = self.probe_media(clip_path)
+        duration = info["duration"] if info["duration"] else config.estimated_clip_sec
+        if config.auto_trim and duration > 6:
+            return max(1.5, duration - 1.0)
+        return duration
+
+    def estimate_timeline_duration(self, clips: list, config: PromoConfig):
+        if not clips:
+            return 0.0
+        return sum(self.effective_clip_duration(c, config) for c in clips)
+
     def download_url_clip(self, url: str):
-        self.log(f"Downloading URL clip (best resolution): {url}")
+        quality_mode = "bestvideo+bestaudio/best" if self.best_resolution_var.get() else "best[height<=720]/best"
+        quality_name = "best resolution" if self.best_resolution_var.get() else "balanced <=720p"
+        self.log(f"Downloading URL clip ({quality_name}): {url}")
         out = str(Path.cwd() / f"clip_{abs(hash(url)) % 100000}.mp4")
         cmd = [
             self.ytdlp_bin,
             "-f",
-            "bestvideo+bestaudio/best",
+            quality_mode,
             "-o",
             out,
             url,
@@ -660,7 +814,7 @@ class MegaAutoPromoApp:
             self.log("yt-dlp not found. URL clips skipped.")
         return None
 
-    def write_concat_file(self, clips: list, build_mode: str):
+    def write_concat_file(self, clips: list, build_mode: str, config: PromoConfig):
         concat_path = str(Path.cwd() / f"concat_inputs_{build_mode}.txt")
         with open(concat_path, "w", encoding="utf-8") as f:
             for c in clips:
@@ -669,10 +823,24 @@ class MegaAutoPromoApp:
                     normalized = normalized.replace("\\", "/")
                 safe_c = normalized.replace("'", "'\\''")
                 f.write(f"file '{safe_c}'\n")
+                if config.auto_trim:
+                    duration = self.probe_media(c).get("duration")
+                    if duration and duration > 6:
+                        f.write("inpoint 0.50\n")
+                        f.write(f"outpoint {max(1.5, duration - 0.5):.2f}\n")
         self.log(f"Concat list written: {concat_path}")
         return concat_path
 
-    def build_ffmpeg_command(self, config: PromoConfig, concat_path: str, output_path: str, preview: bool, build_mode: str):
+    def build_ffmpeg_command(
+        self,
+        config: PromoConfig,
+        concat_path: str,
+        output_path: str,
+        preview: bool,
+        build_mode: str,
+        timeline_duration: float,
+        enable_drawtext: bool = True,
+    ):
         width, height = config.output_width, config.output_height
         if config.aspect_ratio in {"4:3", "16:9", "9:16"} and (not config.output_width or not config.output_height):
             width, height = {
@@ -681,8 +849,10 @@ class MegaAutoPromoApp:
                 "9:16": (720, 1280),
             }[config.aspect_ratio]
 
+        target_duration = config.target_duration_sec if config.enable_v2_longform else max(20, int(timeline_duration or 30))
         if preview:
             width, height = (640, 360)
+            target_duration = min(30, target_duration)
 
         vf_parts = [f"fps={config.output_fps}", f"scale={width}:{height}:force_original_aspect_ratio=decrease", f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"]
         if config.auto_trim:
@@ -691,35 +861,39 @@ class MegaAutoPromoApp:
             vf_parts.append("eq=brightness=0.05:saturation=1.25")
         if config.theme_transitions:
             vf_parts.append(f"fade=t=in:st=0:d={max(0.1, config.transition_sec)}")
-            vf_parts.append(f"fade=t=out:st=29:d={max(0.1, config.transition_sec)}")
+            fade_out_start = max(1.0, target_duration - (1.0 + max(0.1, config.transition_sec)))
+            vf_parts.append(f"fade=t=out:st={fade_out_start:.2f}:d={max(0.1, config.transition_sec)}")
         if config.auto_cut_detection:
             vf_parts.append("unsharp=3:3:0.3")
         if config.auto_edit:
             vf_parts.append("minterpolate=fps=60:mi_mode=mci")
+        if config.ai_best_frame_selection:
+            vf_parts.append("tblend=all_mode=average")
         if config.auto_remix:
             vf_parts.append("setpts=PTS/1.02")
         if config.include_dynamic_stickers:
             vf_parts.append("hue=s=1.05")
 
         drawtext_filters = []
-        safe_title = (config.title or "Mega Deluxe Promo").replace(":", r"\:").replace("'", r"\'")
-        safe_target = (config.target_audience or "All").replace(":", r"\:").replace("'", r"\'")
-        safe_tagline = (config.tagline or "").replace(":", r"\:").replace("'", r"\'")
-        safe_social = (config.social_links or "").replace(":", r"\:").replace("'", r"\'")
-        drawtext_filters.append(
-            f"drawtext=text='{safe_title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=40:box=1:boxcolor=black@0.45"
-        )
-        drawtext_filters.append(
-            f"drawtext=text='Mood\\: {config.mood}  Audience\\: {safe_target}':fontcolor=white:fontsize=22:x=30:y=h-140:box=1:boxcolor=black@0.35"
-        )
-        if config.include_lower_third:
+        if enable_drawtext:
+            safe_title = (config.title or "Mega Deluxe Promo").replace(":", r"\:").replace("'", r"\'")
+            safe_target = (config.target_audience or "All").replace(":", r"\:").replace("'", r"\'")
+            safe_tagline = (config.tagline or "").replace(":", r"\:").replace("'", r"\'")
+            safe_social = (config.social_links or "").replace(":", r"\:").replace("'", r"\'")
             drawtext_filters.append(
-                f"drawtext=text='Date\\: {config.promo_date} | {safe_social}':fontcolor=yellow:fontsize=20:x=30:y=h-90:box=1:boxcolor=black@0.30"
+                f"drawtext=text='{safe_title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=40:box=1:boxcolor=black@0.45"
             )
-        if safe_tagline:
             drawtext_filters.append(
-                f"drawtext=text='{safe_tagline}':fontcolor=cyan:fontsize=26:x=(w-text_w)/2:y=h-50:box=1:boxcolor=black@0.3"
+                f"drawtext=text='Mood\\: {config.mood}  Audience\\: {safe_target}':fontcolor=white:fontsize=22:x=30:y=h-140:box=1:boxcolor=black@0.35"
             )
+            if config.include_lower_third:
+                drawtext_filters.append(
+                    f"drawtext=text='Date\\: {config.promo_date} | {safe_social}':fontcolor=yellow:fontsize=20:x=30:y=h-90:box=1:boxcolor=black@0.30"
+                )
+            if safe_tagline:
+                drawtext_filters.append(
+                    f"drawtext=text='{safe_tagline}':fontcolor=cyan:fontsize=26:x=(w-text_w)/2:y=h-50:box=1:boxcolor=black@0.3"
+                )
 
         cmd = [
             self.ffmpeg_bin,
@@ -736,6 +910,8 @@ class MegaAutoPromoApp:
             cmd.extend(["-i", config.background_songs[0]])
         if config.voiceover_file:
             cmd.extend(["-i", config.voiceover_file])
+        if config.effects_library:
+            cmd.extend(["-i", config.effects_library[0]])
 
         video_graph = ",".join(vf_parts + drawtext_filters)
 
@@ -757,6 +933,14 @@ class MegaAutoPromoApp:
                 vo_index = 2 if config.background_songs else 1
                 filter_parts.append(f"[{vo_index}:a]volume=1.00,acompressor=threshold=-16dB:ratio=3[a2]")
                 mix_inputs.append("[a2]")
+            if config.effects_library:
+                fx_index = 1
+                if config.background_songs:
+                    fx_index += 1
+                if config.voiceover_file:
+                    fx_index += 1
+                filter_parts.append(f"[{fx_index}:a]volume=0.20,apad=pad_dur=600[a3]")
+                mix_inputs.append("[a3]")
 
             if len(mix_inputs) > 1:
                 filter_parts.append(
@@ -801,7 +985,9 @@ class MegaAutoPromoApp:
             ]
         )
 
-        if build_mode == "songs":
+        if config.enable_v2_longform:
+            cmd.extend(["-t", str(target_duration)])
+        elif build_mode == "songs":
             cmd.extend(["-t", str(max(10, config.total_clips * 2))])
         if config.export_format == "gif teaser":
             cmd.extend(["-an", "-loop", "0", output_path.replace(".mp4", ".gif")])

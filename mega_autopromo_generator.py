@@ -58,6 +58,24 @@ class PromoConfig:
     theme_audio_cues: list
     tempo_bpm: int
     tagline: str
+    min_clip_count: int
+    max_clip_count: int
+    total_clips: int
+    output_width: int
+    output_height: int
+    output_fps: int
+    bitrate_kbps: int
+    random_seed: int
+    transition_sec: float
+    dance_intensity: int
+    promo_intensity: int
+    promo_mode: str
+    songs_mode: str
+    remix_mode: str
+    songs_remix_mode: str
+    intro_library: str
+    outro_library: str
+    generated_name: str
 
 
 class MegaAutoPromoApp:
@@ -85,6 +103,7 @@ class MegaAutoPromoApp:
         self.date_var = StringVar(value=datetime.utcnow().strftime("%Y-%m-%d"))
         self.tempo_var = IntVar(value=120)
         self.tagline_var = StringVar(value="")
+        self.generated_name_var = StringVar(value="generated_mega_deluxe")
 
         self.auto_trim_var = BooleanVar(value=True)
         self.best_resolution_var = BooleanVar(value=True)
@@ -101,6 +120,23 @@ class MegaAutoPromoApp:
         self.logo_outro_var = BooleanVar(value=True)
         self.stickers_var = BooleanVar(value=True)
         self.lower_third_var = BooleanVar(value=True)
+        self.min_clip_var = IntVar(value=3)
+        self.max_clip_var = IntVar(value=12)
+        self.total_clips_var = IntVar(value=8)
+        self.width_var = IntVar(value=1280)
+        self.height_var = IntVar(value=720)
+        self.fps_var = IntVar(value=30)
+        self.bitrate_var = IntVar(value=2500)
+        self.seed_var = IntVar(value=random.randint(1, 999999))
+        self.transition_sec_var = StringVar(value="0.45")
+        self.dance_intensity_var = IntVar(value=70)
+        self.promo_intensity_var = IntVar(value=75)
+        self.promo_mode_var = StringVar(value="Auto Promo")
+        self.songs_mode_var = StringVar(value="Auto Songs")
+        self.remix_mode_var = StringVar(value="Auto Remix")
+        self.songs_remix_mode_var = StringVar(value="Balanced")
+        self.intro_library_var = StringVar(value="")
+        self.outro_library_var = StringVar(value="")
 
         self.theme_cue_vars = {
             "Clap": BooleanVar(value=True),
@@ -123,6 +159,7 @@ class MegaAutoPromoApp:
             "Graphics": ttk.Frame(notebook),
             "Output": ttk.Frame(notebook),
             "Promo Logic": ttk.Frame(notebook),
+            "Mega Deluxe Settings": ttk.Frame(notebook),
             "Build & Preview": ttk.Frame(notebook),
         }
 
@@ -135,6 +172,7 @@ class MegaAutoPromoApp:
         self.build_graphics_tab(tabs["Graphics"])
         self.build_output_tab(tabs["Output"])
         self.build_promo_tab(tabs["Promo Logic"])
+        self.build_mega_deluxe_tab(tabs["Mega Deluxe Settings"])
         self.build_build_tab(tabs["Build & Preview"])
 
     def build_sources_tab(self, frame):
@@ -252,20 +290,44 @@ class MegaAutoPromoApp:
             ttk.Checkbutton(cues, text=name, variable=var).pack(side="left", padx=8, pady=4)
 
         self._entry_row(lf, "Auto tagline", self.tagline_var)
+        self._entry_row(lf, "Generated name", self.generated_name_var)
         ttk.Button(lf, text="Generate tagline", command=self.update_tagline).pack(anchor="w", pady=4)
         ttk.Label(lf, text="Automatic tagline placement based on mood + tempo.").pack(anchor="w")
+
+    def build_mega_deluxe_tab(self, frame):
+        lf = ttk.LabelFrame(frame, text="Mega Deluxe Generation Settings")
+        lf.pack(fill="both", expand=True, padx=12, pady=12)
+        self._entry_row(lf, "Min clip", self.min_clip_var)
+        self._entry_row(lf, "Max clip", self.max_clip_var)
+        self._entry_row(lf, "Total clips", self.total_clips_var)
+        self._entry_row(lf, "Width", self.width_var)
+        self._entry_row(lf, "Height", self.height_var)
+        self._entry_row(lf, "FPS", self.fps_var)
+        self._entry_row(lf, "Bitrate (kbps)", self.bitrate_var)
+        self._entry_row(lf, "Random seed", self.seed_var)
+        self._entry_row(lf, "Transition sec", self.transition_sec_var)
+        self._entry_row(lf, "Dance intensity", self.dance_intensity_var)
+        self._entry_row(lf, "Promo intensity", self.promo_intensity_var)
+        self._combo_row(lf, "Promo mode", self.promo_mode_var, ["Auto Promo", "Hyper Promo", "Chill Promo"])
+        self._combo_row(lf, "Songs mode", self.songs_mode_var, ["Auto Songs", "Vocals Focus", "Instrumental Focus"])
+        self._combo_row(lf, "Remix mode", self.remix_mode_var, ["Auto Remix", "Beat Sync", "Motion Sync"])
+        self._combo_row(lf, "Songs remix mode", self.songs_remix_mode_var, ["Balanced", "Aggressive", "Smooth"])
+        self._entry_row(lf, "Intro library", self.intro_library_var)
+        self._entry_row(lf, "Outro library", self.outro_library_var)
 
     def build_build_tab(self, frame):
         top = ttk.Frame(frame)
         top.pack(fill="x", padx=12, pady=8)
 
         ttk.Button(top, text="Save Config JSON", command=self.save_config).pack(side="left", padx=4)
-        ttk.Button(top, text="Build Preview", command=lambda: self.render(preview=True)).pack(side="left", padx=4)
-        ttk.Button(top, text="Build Final", command=lambda: self.render(preview=False)).pack(side="left", padx=4)
+        ttk.Button(top, text="Build Promo", command=lambda: self.render(mode="promo", preview=False)).pack(side="left", padx=4)
+        ttk.Button(top, text="Build Remix", command=lambda: self.render(mode="remix", preview=False)).pack(side="left", padx=4)
+        ttk.Button(top, text="Build Songs", command=lambda: self.render(mode="songs", preview=False)).pack(side="left", padx=4)
+        ttk.Button(top, text="Build Preview", command=lambda: self.render(mode="promo", preview=True)).pack(side="left", padx=4)
 
         self.log_box = Text(frame, height=30)
         self.log_box.pack(fill="both", expand=True, padx=12, pady=8)
-        self.log("Ready. Add sources and click Build Preview or Build Final.")
+        self.log("Ready. Add sources and click Build Promo / Build Remix / Build Songs / Build Preview.")
 
     def resolve_binary(self, base_name: str):
         # Windows 8.1 support: prefer .exe when available.
@@ -382,6 +444,10 @@ class MegaAutoPromoApp:
 
     def collect_config(self):
         cues = [name for name, var in self.theme_cue_vars.items() if var.get()]
+        try:
+            transition_sec = max(0.0, float(self.transition_sec_var.get()))
+        except ValueError:
+            transition_sec = 0.45
         return PromoConfig(
             source_videos=self.source_videos,
             source_urls=self.source_urls,
@@ -414,6 +480,24 @@ class MegaAutoPromoApp:
             theme_audio_cues=cues,
             tempo_bpm=self.tempo_var.get(),
             tagline=self.tagline_var.get(),
+            min_clip_count=max(1, self.min_clip_var.get()),
+            max_clip_count=max(1, self.max_clip_var.get()),
+            total_clips=max(1, self.total_clips_var.get()),
+            output_width=max(2, self.width_var.get()),
+            output_height=max(2, self.height_var.get()),
+            output_fps=max(1, self.fps_var.get()),
+            bitrate_kbps=max(250, self.bitrate_var.get()),
+            random_seed=max(1, self.seed_var.get()),
+            transition_sec=transition_sec,
+            dance_intensity=max(1, self.dance_intensity_var.get()),
+            promo_intensity=max(1, self.promo_intensity_var.get()),
+            promo_mode=self.promo_mode_var.get(),
+            songs_mode=self.songs_mode_var.get(),
+            remix_mode=self.remix_mode_var.get(),
+            songs_remix_mode=self.songs_remix_mode_var.get(),
+            intro_library=self.intro_library_var.get(),
+            outro_library=self.outro_library_var.get(),
+            generated_name=self.generated_name_var.get().strip() or "generated_mega_deluxe",
         )
 
     def save_config(self):
@@ -425,16 +509,16 @@ class MegaAutoPromoApp:
             json.dump(asdict(config), f, indent=2)
         self.log(f"Saved config: {path}")
 
-    def render(self, preview: bool):
+    def render(self, mode: str, preview: bool):
         if not self.source_videos and not self.source_urls:
             messagebox.showwarning("Missing input", "Please add at least one source video file or URL.")
             return
 
         config = self.collect_config()
-        threading.Thread(target=self._render_worker, args=(config, preview), daemon=True).start()
+        threading.Thread(target=self._render_worker, args=(config, mode, preview), daemon=True).start()
 
-    def _render_worker(self, config: PromoConfig, preview: bool):
-        mode = "PREVIEW" if preview else "FINAL"
+    def _render_worker(self, config: PromoConfig, build_mode: str, preview: bool):
+        mode = "PREVIEW" if preview else build_mode.upper()
         self.log(f"--- {mode} BUILD START ---")
 
         downloaded = []
@@ -443,13 +527,17 @@ class MegaAutoPromoApp:
             if out:
                 downloaded.append(out)
 
-        input_clips = config.source_videos + downloaded
-        concat_path = self.write_concat_file(input_clips)
-        output_name = f"autopromo_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        input_clips = self.select_clips_for_mode(config.source_videos + downloaded, config, build_mode)
+        if config.intro_library:
+            input_clips.insert(0, config.intro_library)
+        if config.outro_library:
+            input_clips.append(config.outro_library)
+        concat_path = self.write_concat_file(input_clips, build_mode)
+        output_name = f"{config.generated_name}_{build_mode}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         output_ext = "mp4" if config.export_format == "mp4" else "mp4"
         output_path = str(Path.cwd() / f"{output_name}.{output_ext}")
 
-        ffmpeg_cmd = self.build_ffmpeg_command(config, concat_path, output_path, preview)
+        ffmpeg_cmd = self.build_ffmpeg_command(config, concat_path, output_path, preview, build_mode)
         self.log("FFmpeg command:\n" + " ".join(shlex.quote(s) for s in ffmpeg_cmd))
 
         try:
@@ -464,6 +552,18 @@ class MegaAutoPromoApp:
             self.log("FFmpeg not found. Install ffmpeg and try again.")
 
         self.log(f"--- {mode} BUILD END ---")
+
+    def select_clips_for_mode(self, clips: list, config: PromoConfig, build_mode: str):
+        if not clips:
+            return clips
+        rng = random.Random(config.random_seed + len(build_mode))
+        shuffled = clips[:]
+        rng.shuffle(shuffled)
+        cap = min(config.total_clips, config.max_clip_count, len(shuffled))
+        cap = max(config.min_clip_count, cap)
+        selected = shuffled[:cap]
+        self.log(f"Selected {len(selected)} clips for {build_mode} using seed {config.random_seed}.")
+        return selected
 
     def download_url_clip(self, url: str):
         self.log(f"Downloading URL clip (best resolution): {url}")
@@ -488,8 +588,8 @@ class MegaAutoPromoApp:
             self.log("yt-dlp not found. URL clips skipped.")
         return None
 
-    def write_concat_file(self, clips: list):
-        concat_path = str(Path.cwd() / "concat_inputs.txt")
+    def write_concat_file(self, clips: list, build_mode: str):
+        concat_path = str(Path.cwd() / f"concat_inputs_{build_mode}.txt")
         with open(concat_path, "w", encoding="utf-8") as f:
             for c in clips:
                 normalized = str(Path(c))
@@ -500,12 +600,14 @@ class MegaAutoPromoApp:
         self.log(f"Concat list written: {concat_path}")
         return concat_path
 
-    def build_ffmpeg_command(self, config: PromoConfig, concat_path: str, output_path: str, preview: bool):
-        width, height = {
-            "4:3": (960, 720),
-            "16:9": (1280, 720),
-            "9:16": (720, 1280),
-        }[config.aspect_ratio]
+    def build_ffmpeg_command(self, config: PromoConfig, concat_path: str, output_path: str, preview: bool, build_mode: str):
+        width, height = config.output_width, config.output_height
+        if config.aspect_ratio in {"4:3", "16:9", "9:16"} and (not config.output_width or not config.output_height):
+            width, height = {
+                "4:3": (960, 720),
+                "16:9": (1280, 720),
+                "9:16": (720, 1280),
+            }[config.aspect_ratio]
 
         if preview:
             width, height = (640, 360)
@@ -513,6 +615,7 @@ class MegaAutoPromoApp:
         vf_parts = [f"scale={width}:{height}:force_original_aspect_ratio=decrease", f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"]
         if config.auto_color_grade:
             vf_parts.append("eq=brightness=0.05:saturation=1.25")
+        vf_parts.append(f"fps={config.output_fps}")
 
         vf = ",".join(vf_parts)
 
@@ -541,6 +644,8 @@ class MegaAutoPromoApp:
             "veryfast" if preview else "medium",
             "-crf",
             "28" if preview else "20",
+            "-b:v",
+            f"{config.bitrate_kbps}k",
             "-pix_fmt",
             "yuv420p",
         ])
@@ -572,6 +677,9 @@ class MegaAutoPromoApp:
                 cmd.extend(["-filter:a", f"volume={src_vol}", "-map", "0:v:0", "-map", "0:a:0"])
 
             cmd.append("-shortest")
+
+        if build_mode == "songs":
+            cmd.extend(["-t", str(max(10, config.total_clips * 2))])
 
         cmd.append(output_path)
         return cmd

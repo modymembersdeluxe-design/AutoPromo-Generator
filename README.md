@@ -39,16 +39,32 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
   - Exports: mp4, gif teaser, web preview
   - Preview rendering with low-res profile
   - Quality profile selector (includes 360p)
+  - Mega Deluxe controls for Width, Height, FPS, 360p preview profile, bitrate
 
 - **Promo & Song Logic**
   - Remix styles: Kids dance, Funk, Pop kids
   - Theme cues: Clap, Cheer, Whoosh
   - Automatic tagline generation based on mood + tempo
+  - Build modes: Promo / Remix / Songs
+
+- **Mega Deluxe Generation Settings**
+  - Min Clip / Max Clip / Total Clips for promo-remix-song generation
+  - Random seed for automatic generation behavior
+  - Transition seconds, Dance Intensity, Promo Intensity
+  - Promo mode, Songs mode, Remix mode, Songs remix mode
+  - Intro library and Outro library insertion
+  - Generated naming preset: `Generated Mega Deluxe Promo & Remix & Songs`
 
 ## Run
 
 ```bash
 python3 mega_autopromo_generator.py
+```
+
+On Windows:
+
+```bat
+run_windows.bat
 ```
 
 ## Dependencies

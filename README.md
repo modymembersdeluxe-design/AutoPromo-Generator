@@ -1,4 +1,4 @@
-# Mega AutoPromo Generator (Python GUI)
+# Mega AutoPromo Generator V2 (Python GUI)
 
 A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
 
@@ -6,6 +6,7 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
 
 - **Input & Source Support**
   - Multiple source clips (local files + URL clips via `yt-dlp`)
+  - Bulk URL import (paste one URL per line)
   - Best resolution preference for URLs
   - Auto-trim toggle for irrelevant segments
   - Audio input support (songs, effects library, optional voiceover)
@@ -54,6 +55,7 @@ A mega-deluxe desktop GUI for building FFmpeg-powered AutoPromo videos.
   - Promo mode, Songs mode, Remix mode, Songs remix mode
   - Intro library and Outro library insertion
   - Generated naming preset: `Generated Mega Deluxe Promo & Remix & Songs`
+  - **V2 Long-Form Engine**: target duration + auto-expanded clip sequencing for longer promos
 
 ## Run
 
@@ -77,6 +79,7 @@ run_windows.bat
 - Python 3.8+ (recommended for Windows 8.1 compatibility)
 - FFmpeg in PATH
 - Optional: `yt-dlp` in PATH for URL clip download
+- Optional but recommended: `ffprobe` in PATH for media-duration probing, auto-trim in/out points, and long-form timeline estimation
 
 ## Windows 8.1 support
 
@@ -88,3 +91,5 @@ run_windows.bat
 ## Notes
 
 This app now generates a longer FFmpeg pipeline including metadata overlays, drawtext promo elements, audio loudness/limiter chain, optional background-song + voiceover remix, transition fades, color enhancement, and mode-aware export behavior for promo/remix/songs.
+
+V2 introduces a long-form expansion mode that can repeat selected clips to reach a target runtime, then applies runtime-aware fade-out timing and explicit output duration controls. It now uses `ffprobe` metadata for better clip-duration estimation and concat trimming behavior.

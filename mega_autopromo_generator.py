@@ -320,6 +320,7 @@ class MegaAutoPromoApp:
         top.pack(fill="x", padx=12, pady=8)
 
         ttk.Button(top, text="Save Config JSON", command=self.save_config).pack(side="left", padx=4)
+        ttk.Button(top, text="Import Config JSON", command=self.import_config).pack(side="left", padx=4)
         ttk.Button(top, text="Build Promo", command=lambda: self.render(mode="promo", preview=False)).pack(side="left", padx=4)
         ttk.Button(top, text="Build Remix", command=lambda: self.render(mode="remix", preview=False)).pack(side="left", padx=4)
         ttk.Button(top, text="Build Songs", command=lambda: self.render(mode="songs", preview=False)).pack(side="left", padx=4)
@@ -508,6 +509,77 @@ class MegaAutoPromoApp:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(asdict(config), f, indent=2)
         self.log(f"Saved config: {path}")
+
+    def import_config(self):
+        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json"), ("All", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Import error", f"Failed to import JSON config: {exc}")
+            return
+
+        self.source_videos = data.get("source_videos", []) or []
+        self.source_urls = data.get("source_urls", []) or []
+        self.background_songs = data.get("background_songs", []) or []
+        self.effects_files = data.get("effects_library", []) or []
+        self.voiceover_var.set(data.get("voiceover_file", ""))
+        self.title_var.set(data.get("title", self.title_var.get()))
+        self.target_var.set(data.get("target_audience", self.target_var.get()))
+        self.mood_var.set(data.get("mood", self.mood_var.get()))
+        self.remix_style_var.set(data.get("remix_style", self.remix_style_var.get()))
+        self.aspect_ratio_var.set(data.get("aspect_ratio", self.aspect_ratio_var.get()))
+        self.export_format_var.set(data.get("export_format", self.export_format_var.get()))
+        self.preview_quality_var.set(data.get("preview_quality", self.preview_quality_var.get()))
+        self.auto_trim_var.set(bool(data.get("auto_trim", self.auto_trim_var.get())))
+        self.beat_aligned_var.set(bool(data.get("beat_aligned", self.beat_aligned_var.get())))
+        self.theme_transitions_var.set(bool(data.get("theme_transitions", self.theme_transitions_var.get())))
+        self.auto_remix_var.set(bool(data.get("auto_remix", self.auto_remix_var.get())))
+        self.auto_cut_var.set(bool(data.get("auto_cut_detection", self.auto_cut_var.get())))
+        self.auto_edit_var.set(bool(data.get("auto_edit", self.auto_edit_var.get())))
+        self.auto_mute_var.set(bool(data.get("auto_mute", self.auto_mute_var.get())))
+        self.auto_mute_mode_var.set(data.get("auto_mute_mode", self.auto_mute_mode_var.get()))
+        self.color_grade_var.set(bool(data.get("auto_color_grade", self.color_grade_var.get())))
+        self.auto_captions_var.set(bool(data.get("auto_captions", self.auto_captions_var.get())))
+        self.logo_intro_var.set(bool(data.get("include_logo_intro", self.logo_intro_var.get())))
+        self.logo_outro_var.set(bool(data.get("include_logo_outro", self.logo_outro_var.get())))
+        self.stickers_var.set(bool(data.get("include_dynamic_stickers", self.stickers_var.get())))
+        self.lower_third_var.set(bool(data.get("include_lower_third", self.lower_third_var.get())))
+        self.social_var.set(data.get("social_links", self.social_var.get()))
+        self.date_var.set(data.get("promo_date", self.date_var.get()))
+        self.tempo_var.set(int(data.get("tempo_bpm", self.tempo_var.get())))
+        self.tagline_var.set(data.get("tagline", self.tagline_var.get()))
+        self.min_clip_var.set(int(data.get("min_clip_count", self.min_clip_var.get())))
+        self.max_clip_var.set(int(data.get("max_clip_count", self.max_clip_var.get())))
+        self.total_clips_var.set(int(data.get("total_clips", self.total_clips_var.get())))
+        self.width_var.set(int(data.get("output_width", self.width_var.get())))
+        self.height_var.set(int(data.get("output_height", self.height_var.get())))
+        self.fps_var.set(int(data.get("output_fps", self.fps_var.get())))
+        self.bitrate_var.set(int(data.get("bitrate_kbps", self.bitrate_var.get())))
+        self.seed_var.set(int(data.get("random_seed", self.seed_var.get())))
+        self.transition_sec_var.set(str(data.get("transition_sec", self.transition_sec_var.get())))
+        self.dance_intensity_var.set(int(data.get("dance_intensity", self.dance_intensity_var.get())))
+        self.promo_intensity_var.set(int(data.get("promo_intensity", self.promo_intensity_var.get())))
+        self.promo_mode_var.set(data.get("promo_mode", self.promo_mode_var.get()))
+        self.songs_mode_var.set(data.get("songs_mode", self.songs_mode_var.get()))
+        self.remix_mode_var.set(data.get("remix_mode", self.remix_mode_var.get()))
+        self.songs_remix_mode_var.set(data.get("songs_remix_mode", self.songs_remix_mode_var.get()))
+        self.intro_library_var.set(data.get("intro_library", self.intro_library_var.get()))
+        self.outro_library_var.set(data.get("outro_library", self.outro_library_var.get()))
+        self.generated_name_var.set(data.get("generated_name", self.generated_name_var.get()))
+
+        cues = set(data.get("theme_audio_cues", []))
+        for name, var in self.theme_cue_vars.items():
+            var.set(name in cues if cues else var.get())
+
+        self.refresh_sources_view()
+        self.song_list.delete("1.0", END)
+        self.song_list.insert(END, "\n".join(self.background_songs))
+        self.effects_list.delete("1.0", END)
+        self.effects_list.insert(END, "\n".join(self.effects_files))
+        self.log(f"Imported config: {path}")
 
     def render(self, mode: str, preview: bool):
         if not self.source_videos and not self.source_urls:

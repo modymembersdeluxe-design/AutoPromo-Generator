@@ -67,6 +67,11 @@ On Windows:
 run_windows.bat
 ```
 
+## Config JSON
+
+- Use **Save Config JSON** to export all current generation settings.
+- Use **Import Config JSON** to restore a previously saved setup (sources, modes, output settings, and mega-deluxe options).
+
 ## Dependencies
 
 - Python 3.8+ (recommended for Windows 8.1 compatibility)
